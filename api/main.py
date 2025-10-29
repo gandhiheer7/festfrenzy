@@ -49,7 +49,7 @@ PRE_DEFINED_ACCOUNTS = [
     {"name": "Oculus", "email": "oculus@spit.com", "password": "oculus@1", "role": "organizer"}
 ]
 
-""" # --- TEMPORARY SETUP SCRIPT --- 
+ # --- TEMPORARY SETUP SCRIPT --- 
 
 @app.get("/api/admin/setup-all-accounts")
 def setup_all_accounts(db: Session = Depends(get_db)):
@@ -89,7 +89,7 @@ def setup_all_accounts(db: Session = Depends(get_db)):
                 db.rollback() # Rollback changes for this user if creation failed
 
     return {"message": "All accounts processed.", "results": results}
-# --- END OF SCRIPT --- """
+# --- END OF SCRIPT --- 
 
 # --- (read_users_me and login_for_access_token remain the same) ---
 @app.get("/api/users/me", response_model=schemas.User)
