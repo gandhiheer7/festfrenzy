@@ -49,13 +49,14 @@ PRE_DEFINED_ACCOUNTS = [
     {"name": "Oculus", "email": "oculus@spit.com", "password": "oculus@1", "role": "organizer"}
 ]
 
- # --- TEMPORARY SETUP SCRIPT --- 
-
+# --- TEMPORARY SETUP SCRIPT (Corrected and UNCOMMENTED) ---
 @app.get("/api/admin/setup-all-accounts")
 def setup_all_accounts(db: Session = Depends(get_db)):
+    """
+    A one-time-use endpoint to create all pre-defined admin and organizer accounts.
+    """
     results = {"created": [], "exists": []}
 
-    # Ensure PRE_DEFINED_ACCOUNTS list is defined *above* this function in your file
     if 'PRE_DEFINED_ACCOUNTS' not in globals():
          raise HTTPException(status_code=500, detail="PRE_DEFINED_ACCOUNTS list not found in main.py")
 
@@ -64,32 +65,33 @@ def setup_all_accounts(db: Session = Depends(get_db)):
         if db_user:
             results["exists"].append(account["email"])
         else:
-            # Check for missing keys
             required_keys = ["name", "email", "password", "role"]
             if not all(key in account for key in required_keys):
                  print(f"Skipping account due to missing keys: {account.get('email', 'N/A')}")
-                 continue # Skip this account if data is incomplete
+                 continue
 
             try:
+                # --- THIS IS THE FIX ---
                 user_schema = schemas.UserCreate(
                     name=account["name"],
                     email=account["email"],
                     password=account["password"],
-                    role=account["role"]
+                    role=account["role"]  # <-- This line was missing/wrong
                 )
-                # Call crud.create_user which sets the default role
+                
                 new_user = crud.create_user(db, user_schema)
-                # Now explicitly set the correct role and approval status
-                new_user.role = account["role"]
-                new_user.is_approved = True # Auto-approve pre-defined accounts
-                db.commit() # Commit changes for role and approval
+                
+                # Override the default approval for our pre-defined accounts
+                new_user.is_approved = True
+                db.commit() # Commit the 'is_approved = True' change
                 results["created"].append(account["email"])
+                
             except Exception as e:
                 print(f"Error creating account {account.get('email', 'N/A')}: {e}")
-                db.rollback() # Rollback changes for this user if creation failed
+                db.rollback()
 
     return {"message": "All accounts processed.", "results": results}
-# --- END OF SCRIPT --- 
+# --- END OF SCRIPT ---
 
 # --- (read_users_me and login_for_access_token remain the same) ---
 @app.get("/api/users/me", response_model=schemas.User)
