@@ -72,11 +72,12 @@ def setup_all_accounts(db: Session = Depends(get_db)):
 
             try:
                 # --- THIS IS THE FIX ---
+                # Pass the 'role' field *into* the UserCreate schema
                 user_schema = schemas.UserCreate(
                     name=account["name"],
                     email=account["email"],
                     password=account["password"],
-                    role=account["role"]  # <-- This line was missing/wrong
+                    role=account["role"]  # <-- THIS WAS THE MISSING PIECE
                 )
                 
                 new_user = crud.create_user(db, user_schema)

@@ -8,24 +8,41 @@ def get_user_by_email(db: Session, email: str):
     return db.query(models.User).filter(models.User.email == email).first()
 
 def authenticate_user(db: Session, email: str, password: str):
+    """Check if a user's email and password are correct."""
+    print(f"--- Authenticating User ---")
+    print(f"Attempting login for email: {email}")
     user = get_user_by_email(db, email)
     if not user:
+        print(f"Authentication failed: User with email '{email}' not found.")
         return False
-    if not security.verify_password(password, user.hashed_password):
+
+    print(f"User '{email}' found. Verifying password...")
+    password_verified = security.verify_password(password, user.hashed_password)
+
+    if not password_verified:
+        print(f"Authentication failed: Password verification failed for email '{email}'.")
         return False
+        
+    print(f"Authentication successful for email: {email}")
     return user
 
 def create_user(db: Session, user: schemas.UserCreate):
     """Create a new user in the database."""
     hashed_password = security.get_password_hash(user.password)
+    
+    # --- THIS IS THE FIX ---
+    # Define the approval status based on the input role
     is_approved = True if user.role == models.UserRole.attendee else False
+    
     db_user = models.User(
         email=user.email,
         name=user.name,
         hashed_password=hashed_password,
-        role=user.role, # Use the role from the input schema
-        is_approved=is_approved # Set based on role
+        role=user.role,
+        is_approved=is_approved # <-- Use the correct variable name 'is_approved'
     )
+    # --- END FIX ---
+
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
