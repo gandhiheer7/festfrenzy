@@ -4,10 +4,10 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 # Get the directory where this 'database.py' file is located
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Define the database path to be *inside* the 'api' folder
-DB_PATH = os.path.join(BASE_DIR, "festfrenzy.db")
+DB_PATH = "/tmp/festfrenzy.db"
 
 # Update the URL to use this new, absolute path
 SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
