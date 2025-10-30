@@ -49,7 +49,7 @@ PRE_DEFINED_ACCOUNTS = [
     {"name": "Oculus", "email": "oculus@spit.com", "password": "oculus@1", "role": "organizer"}
 ]
 
-""" --- TEMPORARY SETUP SCRIPT (Corrected and UNCOMMENTED) ---
+# --- TEMPORARY SETUP SCRIPT (Corrected and UNCOMMENTED) ---
 @app.get("/api/admin/setup-all-accounts")
 def setup_all_accounts(db: Session = Depends(get_db)):
     #A one-time-use endpoint to create all pre-defined admin and organizer accounts.
