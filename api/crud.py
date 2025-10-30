@@ -180,26 +180,3 @@ def create_booking(db: Session, event_id: int, attendee_id: int):
     db.refresh(db_booking.event.organizer)
 
     return db_booking # Return the successful booking object
-
-def authenticate_user(db: Session, email: str, password: str):
-    """Check if a user's email and password are correct."""
-    print(f"--- Authenticating User ---") # --- NEW LOG ---
-    print(f"Attempting login for email: {email}") # --- NEW LOG ---
-    user = get_user_by_email(db, email)
-    if not user:
-        print(f"Authentication failed: User with email '{email}' not found.") # --- NEW LOG ---
-        return False # User doesn't exist
-
-    print(f"User '{email}' found. Verifying password...") # --- NEW LOG ---
-    password_verified = security.verify_password(password, user.hashed_password)
-
-    if not password_verified:
-        print(f"Authentication failed: Password verification failed for email '{email}'.") # --- NEW LOG ---
-        # --- Optional: Log the hash being compared for deep debugging ---
-        # print(f"Stored hash: {user.hashed_password}")
-        # print(f"Hash of entered password: {security.get_password_hash(password)}")
-        # --- End Optional ---
-        return False # Password incorrect
-
-    print(f"Authentication successful for email: {email}") # --- NEW LOG ---
-    return user # Authentication successful
