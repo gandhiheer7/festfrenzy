@@ -1,40 +1,9 @@
-from pydantic import BaseModel, EmailStr, field_validator, root_validator, confloat
+# api/schemas.py
+from pydantic import BaseModel, EmailStr, ConfigDict
+from datetime import datetime
 from typing import Optional
-from datetime import datetime 
-from . import models
-import enum
 
-# --- User Schemas (No changes) ---
-class UserCreate(BaseModel):
-    name: str
-    email: EmailStr
-    password: str
-    role: models.UserRole
-
-    @field_validator('password')
-    @classmethod
-    def validate_password_length(cls, v):
-        if len(v.encode('utf-8')) > 72:
-            raise ValueError("Password must be 72 characters or less.")
-        return v
-    
-    # --- NEW VALIDATOR FOR ATTENDEE RULES ---
-    @root_validator(pre=False, skip_on_failure=True)
-    def check_attendee_rules(cls, values):
-        role = values.get('role')
-        email = values.get('email')
-        password = values.get('password')
-
-        if role == models.UserRole.attendee:
-            # Rule 1: Email must end with @spit.ac.in
-            if not email or not email.endswith('@spit.ac.in'):
-                raise ValueError('Attendee email must end with @spit.ac.in')
-            # Rule 2: Password must match email
-            if password != email:
-                raise ValueError('Attendee password must match their email address')
-        # No specific rules for organizer password matching email here
-        return values
-
+# --- Token Schemas (For Authentication later) ---
 class Token(BaseModel):
     access_token: str
     token_type: str
@@ -42,81 +11,53 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     email: Optional[str] = None
 
-class User(BaseModel):
-    id: int
-    name: str
+# --- User Schemas ---
+class UserBase(BaseModel):
     email: EmailStr
-    role: str
-    is_approved: bool
+    full_name: str
 
-    class Config:
-        from_attributes = True
+class UserCreate(UserBase):
+    password: str
 
-# --- ADD THESE NEW VENUE SCHEMAS ---
-class VenueBase(BaseModel):
-    name: str
-    location: str
-    capacity: int
-
-class VenueCreate(VenueBase):
-    pass
-
-class Venue(VenueBase):
+class UserResponse(UserBase):
     id: int
+    is_active: bool
+    is_admin: bool
+    created_at: datetime
 
-    class Config:
-        from_attributes = True
+    # This tells Pydantic to read data even if it's not a standard dictionary 
+    # (i.e., read directly from our SQLAlchemy database models)
+    model_config = ConfigDict(from_attributes=True)
 
-# --- ADD THESE NEW EVENT SCHEMAS ---
+# --- Event Schemas ---
 class EventBase(BaseModel):
     title: str
     description: str
-    event_datetime: datetime
-    end_datetime: datetime
-    capacity: int
-    venue_id: int
-    cost: confloat(ge=0.0)
+    date: datetime
+    location: str
+    capacity: int = 100
+    image_url: Optional[str] = None
 
 class EventCreate(EventBase):
-    @root_validator(pre=False, skip_on_failure=True)
-    def check_dates(cls, values):
-        start = values.get('event_datetime')
-        end = values.get('end_datetime')
-        if start and end and end <= start:
-            raise ValueError('End date & time must be after start date & time')
-        return values
-
-class Event(EventBase):
-    id: int
-    organizer_id: int
-    # Include nested Venue and Organizer info when returning an Event
-    venue: Venue
-    organizer: User # Use the existing User schema
-
-    class Config:
-        from_attributes = True
-
-class BookingStatus(str, enum.Enum):
-    PENDING_PAYMENT = "pending_payment"
-    CONFIRMED = "confirmed"
-    REJECTED = "rejected"
-    CANCELLED = "cancelled"
-
-# --- ADD BOOKING SCHEMAS ---
-class BookingBase(BaseModel):
-    event_id: int
-
-class BookingCreate(BookingBase):
-    # Attendee ID will come from the logged-in user (token)
     pass
 
-class Booking(BookingBase):
+class EventResponse(EventBase):
     id: int
-    attendee_id: int
-    booking_time: datetime
-    status: BookingStatus
-    event: Event # Include full event details
+    creator_id: int
+    created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
+# --- Registration Schemas ---
+class RegistrationBase(BaseModel):
+    event_id: int
+
+class RegistrationCreate(RegistrationBase):
+    pass
+
+class RegistrationResponse(RegistrationBase):
+    id: int
+    user_id: int
+    registered_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
