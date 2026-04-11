@@ -5,7 +5,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
 
-from . import crud, models, schemas, security, database
+import crud, models, schemas, security, database
 
 # Create the database tables automatically (SQLite only, use Alembic for production)
 models.Base.metadata.create_all(bind=database.engine)

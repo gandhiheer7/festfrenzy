@@ -1,6 +1,6 @@
 # api/crud.py
 from sqlalchemy.orm import Session
-from . import models, schemas, security
+import models, schemas, security
 
 # --- User Operations ---
 

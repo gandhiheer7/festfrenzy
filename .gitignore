@@ -1,21 +1,15 @@
-# Node.js
+# Python
+api/venv/
+api/__pycache__/
+api/*.pyc
+api/*.db
+api/.env
+
+# Node
 node_modules/
 .next/
-npm-debug.log
-*.log
-
-# Python
-venv/
-.venv/
-env/
-api/venv/
-api/api/venv/
-__pycache__/
-*.pyc
-
-# Database
-api/festfrenzy.db
-festfrenzy.db
+.env.local
 
 # OS
 .DS_Store
+Thumbs.db
