@@ -5,7 +5,11 @@ npm-debug.log
 *.log
 
 # Python
+venv/
+.venv/
+env/
 api/venv/
+api/api/venv/
 __pycache__/
 *.pyc
 
