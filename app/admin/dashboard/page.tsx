@@ -1,234 +1,186 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { Header } from "@/components/header"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { useRouter } from "next/navigation"
-import axios from "axios"
-import { Loader2 } from "lucide-react"
-
-// --- User Interface ---
-interface User {
-  id: number;
-  name: string;
-  email: string;
-  role: "organizer" | "admin";
-  is_approved: boolean;
-}
-
-// --- UPDATED Venue Interface ---
-interface Venue {
-  id: number;
-  name: string;
-  location: string;
-  capacity: number;
-}
-
-// --- Loading Component ---
-function FullPageLoader() {
-  return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-background">
-      <Loader2 className="h-12 w-12 animate-spin text-primary" />
-    </div>
-  )
-}
+import { Badge } from "@/components/ui/badge"
+import { Loader2, Trash2, ShieldCheck, ShieldOff } from "lucide-react"
+import { api, getToken, type User, type Venue } from "@/lib/api"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function AdminDashboardPage() {
-  // --- Venue states ---
+  const router = useRouter()
+  const { toast } = useToast()
+
+  const [user, setUser] = useState<User | null>(null)
+  const [users, setUsers] = useState<User[]>([])
+  const [venues, setVenues] = useState<Venue[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Venue form
   const [venueName, setVenueName] = useState("")
   const [venueLocation, setVenueLocation] = useState("")
   const [venueCapacity, setVenueCapacity] = useState("")
-  const [venues, setVenues] = useState<Venue[]>([]) // Initialize as empty
-  const [venueError, setVenueError] = useState<string | null>(null) // For venue form errors
+  const [venueLoading, setVenueLoading] = useState(false)
 
-  // --- Auth & Data States ---
-  const [adminUser, setAdminUser] = useState<User | null>(null)
-  const [pendingOrganizers, setPendingOrganizers] = useState<User[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const router = useRouter()
-
-  // --- 1. Authentication Effect (No changes) ---
-  useEffect(() => {
-    const fetchUser = async () => {
-      const token = localStorage.getItem("festfrenzy_token")
-      if (!token) {
-        router.push("/login");
-        return;
-      }
-      try {
-        const response = await axios.get("/api/users/me", {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        const userData: User = response.data
-        if (userData.role === "organizer") {
-          router.push("/dashboard");
-        } else if (userData.role === "admin") {
-          setAdminUser(userData);
-        } else {
-          setError("You do not have permission to view this page.");
-          localStorage.removeItem("festfrenzy_token");
-          router.push("/login");
-        }
-      } catch (err: any) {
-        console.error("Auth error:", err);
-        setError(err.response?.data?.detail || "Session expired. Please log in again.");
-        localStorage.removeItem("festfrenzy_token");
-        router.push("/login");
-      }
+  const loadData = useCallback(async () => {
+    const token = getToken()
+    if (!token) { router.push("/login"); return }
+    try {
+      const me = await api.getMe()
+      if (!me.is_admin) { router.push("/events"); return }
+      setUser(me)
+      const [usersData, venuesData] = await Promise.all([
+        api.getAllUsers(),
+        api.getVenues(),
+      ])
+      setUsers(usersData)
+      setVenues(venuesData)
+    } catch {
+      router.push("/login")
+    } finally {
+      setLoading(false)
     }
-    fetchUser()
   }, [router])
 
-  // --- 2. Data Fetching Effect (UPDATED to fetch venues) ---
-  useEffect(() => {
-    const fetchData = async () => {
-      if (adminUser) { // Only run if we are a confirmed admin
-        const token = localStorage.getItem("festfrenzy_token")
-        try {
-          // Fetch both sets of data
-          const [orgResponse, venueResponse] = await Promise.all([
-            axios.get("/api/admin/pending-organizers", {
-              headers: { Authorization: `Bearer ${token}` }
-            }),
-            axios.get("/api/venues") // This is a public endpoint
-          ]);
-          
-          setPendingOrganizers(orgResponse.data)
-          setVenues(venueResponse.data)
+  useEffect(() => { loadData() }, [loadData])
 
-        } catch (err: any) {
-          console.error("Failed to fetch data:", err)
-          setError(err.response?.data?.detail || "Could not load data.")
-        } finally {
-          setLoading(false) // Stop loader after *all* data is fetched
-        }
-      }
-    }
-    fetchData()
-  }, [adminUser]) // This effect depends on 'adminUser'
-
-  // --- 3. Approve Button Handler (No changes) ---
-  const handleApprove = async (userId: number) => {
-    const token = localStorage.getItem("festfrenzy_token")
+  const handleToggleAdmin = async (targetUser: User) => {
     try {
-      await axios.post(`/api/admin/approve-organizer/${userId}`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
+      const updated = targetUser.is_admin
+        ? await api.removeAdmin(targetUser.id)
+        : await api.makeAdmin(targetUser.id)
+      setUsers((prev) => prev.map((u) => u.id === updated.id ? updated : u))
+      toast({
+        title: "Updated",
+        description: `${updated.full_name} is ${updated.is_admin ? "now" : "no longer"} an admin.`,
       })
-      setPendingOrganizers((prev) => prev.filter((user) => user.id !== userId))
-    } catch (err: any) {
-      console.error("Failed to approve:", err)
-      alert(err.response?.data?.detail || "Could not approve organizer.")
+    } catch (err: unknown) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err instanceof Error ? err.message : "Could not update user.",
+      })
     }
   }
 
-  // --- 4. UPDATED Venue Handlers ---
   const handleAddVenue = async (e: React.FormEvent) => {
-    e.preventDefault(); // Prevent form from reloading page
-    setVenueError(null);
-    
-    if (!venueName || !venueLocation || !venueCapacity) {
-      setVenueError("All fields are required.");
-      return;
-    }
-    
-    const token = localStorage.getItem("festfrenzy_token")
+    e.preventDefault()
+    if (!venueName || !venueLocation || !venueCapacity) return
+    setVenueLoading(true)
     try {
-      const response = await axios.post("/api/admin/venues", {
+      const newVenue = await api.createVenue({
         name: venueName,
         location: venueLocation,
-        capacity: parseInt(venueCapacity)
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      // Add new venue to the list in the UI
-      setVenues((prev) => [...prev, response.data]);
-      
-      // Reset form
-      setVenueName("");
-      setVenueLocation("");
-      setVenueCapacity("");
-
-    } catch (err: any) {
-      console.error("Failed to add venue:", err);
-      setVenueError(err.response?.data?.detail || "Could not add venue.");
+        capacity: parseInt(venueCapacity),
+      })
+      setVenues((prev) => [...prev, newVenue])
+      setVenueName("")
+      setVenueLocation("")
+      setVenueCapacity("")
+      toast({ title: "Venue added", description: `${newVenue.name} created successfully.` })
+    } catch (err: unknown) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err instanceof Error ? err.message : "Could not add venue.",
+      })
+    } finally {
+      setVenueLoading(false)
     }
   }
 
-  const handleDeleteVenue = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this venue?")) {
-      return;
-    }
-
-    const token = localStorage.getItem("festfrenzy_token")
+  const handleDeleteVenue = async (id: number, name: string) => {
+    if (!confirm(`Delete venue "${name}"? This cannot be undone.`)) return
     try {
-      await axios.delete(`/api/admin/venues/${id}`, {
-         headers: { Authorization: `Bearer ${token}` }
-      });
-      // Remove venue from the list in the UI
-      setVenues((prev) => prev.filter((v) => v.id !== id));
-    } catch (err: any) {
-      console.error("Failed to delete venue:", err);
-      alert(err.response?.data?.detail || "Could not delete venue.");
+      await api.deleteVenue(id)
+      setVenues((prev) => prev.filter((v) => v.id !== id))
+      toast({ title: "Deleted", description: `${name} removed.` })
+    } catch (err: unknown) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err instanceof Error ? err.message : "Could not delete venue.",
+      })
     }
   }
 
-  // --- RENDER LOGIC ---
-  if (loading || !adminUser) {
-    return <FullPageLoader />
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <Header userName={adminUser.name} userRole={adminUser.role} />
+      <Header user={user} />
+      <main className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Admin Dashboard</h1>
+          <p className="text-muted-foreground mt-1">Manage users, venues, and events</p>
+        </div>
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* ... (Header section - no changes) ... */}
-        <div className="mb-8">
-           <h1 className="text-3xl font-bold text-foreground">Admin Dashboard</h1>
-           <p className="text-muted-foreground mt-2">Manage organizers and venues</p>
-         </div>
+        {/* Stats Row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: "Total Users", value: users.length },
+            { label: "Admins", value: users.filter((u) => u.is_admin).length },
+            { label: "Venues", value: venues.length },
+            { label: "Total Capacity", value: venues.reduce((a, v) => a + v.capacity, 0) },
+          ].map((stat) => (
+            <Card key={stat.label} className="border-primary/10">
+              <CardContent className="pt-6">
+                <p className="text-2xl font-bold text-primary">{stat.value}</p>
+                <p className="text-sm text-muted-foreground">{stat.label}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
 
-        <Tabs defaultValue="organizers" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-8">
-            <TabsTrigger value="organizers">Approve Organizers</TabsTrigger>
+        <Tabs defaultValue="venues" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
             <TabsTrigger value="venues">Manage Venues</TabsTrigger>
+            <TabsTrigger value="users">Manage Users</TabsTrigger>
           </TabsList>
 
-          {/* Approve Organizers Tab (No changes) */}
-          <TabsContent value="organizers" className="space-y-4">
-             {/* ... (Organizers Table JSX - no changes) ... */}
-          </TabsContent>
-
-          {/* --- UPDATED Manage Venues Tab --- */}
+          {/* Venues Tab */}
           <TabsContent value="venues" className="space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              
-              {/* Existing Venues Card */}
+              {/* Existing Venues */}
               <Card className="border-primary/10">
                 <CardHeader>
                   <CardTitle>Existing Venues</CardTitle>
-                  <CardDescription>Current venues in the system</CardDescription>
+                  <CardDescription>{venues.length} venue{venues.length !== 1 ? "s" : ""} in system</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
                     {venues.length === 0 ? (
-                      <p className="text-center text-muted-foreground">No venues created yet.</p>
+                      <p className="text-center text-muted-foreground py-4">No venues yet.</p>
                     ) : (
                       venues.map((venue) => (
-                        <div key={venue.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                        <div
+                          key={venue.id}
+                          className="flex items-center justify-between p-3 bg-muted rounded-lg"
+                        >
                           <div>
-                            <span className="font-medium text-foreground">{venue.name}</span>
-                            <p className="text-sm text-muted-foreground">{venue.location} (Cap: {venue.capacity})</p>
+                            <p className="font-medium text-foreground">{venue.name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {venue.location} · Cap: {venue.capacity}
+                            </p>
                           </div>
-                          <Button size="sm" variant="destructive" onClick={() => handleDeleteVenue(venue.id)}>
-                            Delete
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleDeleteVenue(venue.id, venue.name)}
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
                       ))
@@ -237,64 +189,96 @@ export default function AdminDashboardPage() {
                 </CardContent>
               </Card>
 
-              {/* Add New Venue Card */}
+              {/* Add Venue */}
               <Card className="border-primary/10">
                 <CardHeader>
                   <CardTitle>Add New Venue</CardTitle>
-                  <CardDescription>Create a new venue</CardDescription>
+                  <CardDescription>Create a venue for events</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {/* Form now has an onSubmit handler */}
                   <form onSubmit={handleAddVenue} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="venue-name">Venue Name</Label>
+                      <Label htmlFor="v-name">Venue Name</Label>
                       <Input
-                        id="venue-name"
-                        placeholder="Enter venue name"
+                        id="v-name"
+                        placeholder="e.g. Main Auditorium"
                         value={venueName}
                         onChange={(e) => setVenueName(e.target.value)}
-                        className="border-primary/20"
                         required
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="venue-location">Location</Label>
+                      <Label htmlFor="v-location">Location</Label>
                       <Input
-                        id="venue-location"
-                        placeholder="e.g., 'Tech Building, Room 201'"
+                        id="v-location"
+                        placeholder="e.g. Block A, Ground Floor"
                         value={venueLocation}
                         onChange={(e) => setVenueLocation(e.target.value)}
-                        className="border-primary/20"
                         required
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="venue-capacity">Capacity</Label>
+                      <Label htmlFor="v-cap">Capacity</Label>
                       <Input
-                        id="venue-capacity"
+                        id="v-cap"
                         type="number"
-                        placeholder="e.g., 150"
+                        min="1"
+                        placeholder="e.g. 200"
                         value={venueCapacity}
                         onChange={(e) => setVenueCapacity(e.target.value)}
-                        className="border-primary/20"
                         required
                       />
                     </div>
-
-                    {venueError && (
-                      <p className="text-sm text-red-600">{venueError}</p>
-                    )}
-
-                    <Button
-                      type="submit" // Button is now a submit button
-                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-                    >
-                      Add Venue
+                    <Button type="submit" className="w-full" disabled={venueLoading}>
+                      {venueLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Add Venue"}
                     </Button>
                   </form>
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          {/* Users Tab */}
+          <TabsContent value="users" className="space-y-4">
+            <Card className="border-primary/10">
+              <CardHeader>
+                <CardTitle>All Users</CardTitle>
+                <CardDescription>Grant or revoke admin privileges</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {users.map((u) => (
+                    <div
+                      key={u.id}
+                      className="flex items-center justify-between p-3 bg-muted rounded-lg"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-foreground">{u.full_name}</p>
+                          {u.is_admin && (
+                            <Badge variant="default" className="text-xs bg-primary">Admin</Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">{u.email}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant={u.is_admin ? "destructive" : "outline"}
+                        onClick={() => handleToggleAdmin(u)}
+                        disabled={u.id === user?.id}
+                        title={u.id === user?.id ? "Cannot change your own role" : ""}
+                      >
+                        {u.is_admin ? (
+                          <><ShieldOff className="w-4 h-4 mr-1" /> Remove Admin</>
+                        ) : (
+                          <><ShieldCheck className="w-4 h-4 mr-1" /> Make Admin</>
+                        )}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </main>

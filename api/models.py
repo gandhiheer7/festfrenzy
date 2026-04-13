@@ -1,8 +1,12 @@
 # api/models.py
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import (
+    Column, Integer, String, Boolean,
+    DateTime, ForeignKey, Text, Float, UniqueConstraint
+)
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from database import Base
+
 
 class User(Base):
     __tablename__ = "users"
@@ -12,12 +16,24 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     full_name = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
-    is_admin = Column(Boolean, default=False) # True for fest organizers
+    is_admin = Column(Boolean, default=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
-    # Relationships
     events_created = relationship("Event", back_populates="creator")
     registrations = relationship("Registration", back_populates="user")
+
+
+class Venue(Base):
+    __tablename__ = "venues"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    location = Column(String, nullable=False)
+    capacity = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    events = relationship("Event", back_populates="venue")
+
 
 class Event(Base):
     __tablename__ = "events"
@@ -25,18 +41,21 @@ class Event(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, index=True, nullable=False)
     description = Column(Text, nullable=False)
-    date = Column(DateTime, nullable=False)
-    location = Column(String, nullable=False)
-    capacity = Column(Integer, default=100)
-    image_url = Column(String, nullable=True) # URL to cover image
+    category = Column(String, nullable=False, default="General")
+    event_datetime = Column(DateTime, nullable=False)
+    end_datetime = Column(DateTime, nullable=False)
+    capacity = Column(Integer, nullable=False, default=100)
+    cost = Column(Float, nullable=False, default=0.0)
+    image_url = Column(String, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    
-    # Foreign Keys
-    creator_id = Column(Integer, ForeignKey("users.id"))
-    
-    # Relationships
+
+    creator_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    venue_id = Column(Integer, ForeignKey("venues.id"), nullable=False)
+
     creator = relationship("User", back_populates="events_created")
+    venue = relationship("Venue", back_populates="events")
     registrations = relationship("Registration", back_populates="event")
+
 
 class Registration(Base):
     __tablename__ = "registrations"
@@ -46,6 +65,10 @@ class Registration(Base):
     event_id = Column(Integer, ForeignKey("events.id"), nullable=False)
     registered_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
-    # Relationships
+    # Prevents the same user from registering for the same event twice
+    __table_args__ = (
+        UniqueConstraint("user_id", "event_id", name="uq_user_event"),
+    )
+
     user = relationship("User", back_populates="registrations")
     event = relationship("Event", back_populates="registrations")

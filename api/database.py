@@ -1,20 +1,23 @@
 # api/database.py
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
+from dotenv import load_dotenv
 
-# Use SQLite for local development. It will create a "festfrenzy.db" file.
-SQLALCHEMY_DATABASE_URL = "sqlite:///./festfrenzy.db"
+load_dotenv()
 
-# connect_args={"check_same_thread": False} is required only for SQLite in FastAPI
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./festfrenzy.db")
+
+# connect_args only needed for SQLite
+connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+
+engine = create_engine(DATABASE_URL, connect_args=connect_args)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 
-# Dependency to get the database session in our routes
+
 def get_db():
     db = SessionLocal()
     try:
