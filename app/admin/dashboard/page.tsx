@@ -122,9 +122,17 @@ export default function AdminDashboardPage() {
     <div className="min-h-screen bg-background">
       <Header user={user} />
       <main className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Admin Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Manage users, venues, and events</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Admin Dashboard</h1>
+              <p className="text-muted-foreground mt-1">Manage users, venues, and events</p>
+          </div>
+          <Button
+            onClick={() => router.push("/admin/events/new")}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground"
+          >
+            + Create Event
+          </Button>
         </div>
 
         {/* Stats Row */}

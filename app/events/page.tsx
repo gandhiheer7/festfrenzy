@@ -27,10 +27,10 @@ function formatDateRange(start: string, end: string): string {
     if (isNaN(s.getTime()) || isNaN(e.getTime())) return "Invalid Date"
 
     const dateOpts: Intl.DateTimeFormatOptions = {
-      year: "numeric", month: "short", day: "numeric", timeZone: "Asia/Kolkata",
+      year: "numeric", month: "short", day: "numeric",
     }
     const timeOpts: Intl.DateTimeFormatOptions = {
-      hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata",
+      hour: "numeric", minute: "2-digit", hour12: true,
     }
 
     const startDate = s.toLocaleDateString("en-IN", dateOpts)

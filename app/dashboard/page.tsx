@@ -15,7 +15,6 @@ function formatDate(dateStr: string): string {
     return new Date(dateStr).toLocaleDateString("en-IN", {
       year: "numeric", month: "short", day: "numeric",
       hour: "numeric", minute: "2-digit", hour12: true,
-      timeZone: "Asia/Kolkata",
     })
   } catch {
     return "Invalid Date"
