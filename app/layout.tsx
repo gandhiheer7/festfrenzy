@@ -5,7 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "FestFrenzy — College Event Portal",
+  title: "FestFrenzy - College Event Portal",
   description: "Discover and register for college events with FestFrenzy",
 }
 
